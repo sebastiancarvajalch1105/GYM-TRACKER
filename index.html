@@ -1,0 +1,1046 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GymPRO Coach - Tracker de Entrenamiento</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: { red: '#EF4444', dark: '#0F172A', card: '#1E293B', border: '#334155', accent: '#3B82F6' }
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-slate-950 text-slate-100 font-sans min-h-screen pb-24 selection:bg-red-500 selection:text-white">
+
+  <!-- Sticky Top Progress Bar -->
+  <div class="sticky top-0 z-40 bg-slate-900/95 backdrop-blur border-b border-slate-800 px-4 py-2 text-xs shadow-md">
+    <div class="max-w-md mx-auto flex items-center justify-between gap-3">
+      <div class="flex items-center gap-2">
+        <span class="font-bold text-red-500 uppercase tracking-wider" id="sticky-day">LUNES</span>
+        <span class="text-slate-400">|</span>
+        <span id="sticky-completed-text" class="text-slate-300 font-medium">0/6 ejer.</span>
+      </div>
+      <div class="flex-1 max-w-[120px] bg-slate-800 rounded-full h-2.5 overflow-hidden">
+        <div id="sticky-progress-fill" class="bg-red-500 h-full transition-all duration-300" style="width: 0%"></div>
+      </div>
+      <span id="sticky-cal" class="text-amber-400 font-semibold"><i class="fa-solid fa-fire text-xs mr-1"></i>0 kcal</span>
+    </div>
+  </div>
+
+  <!-- Main Container -->
+  <div class="max-w-md mx-auto px-4 pt-4">
+
+    <!-- Header -->
+    <header class="flex items-center justify-between mb-4">
+      <div>
+        <h1 class="text-xl font-extrabold tracking-tight text-white flex items-center gap-2">
+          <i class="fa-solid fa-dumbbell text-red-500"></i> GymPRO <span class="text-xs bg-red-500/20 text-red-400 border border-red-500/30 px-2 py-0.5 rounded-full font-normal">v2.2</span>
+        </h1>
+        <p class="text-xs text-slate-400">Periodización 8 Semanas + Descarga</p>
+      </div>
+      <button onclick="openPinModal('edit')" class="text-slate-400 hover:text-white text-sm bg-slate-800 border border-slate-700 px-3 py-1.5 rounded-lg flex items-center gap-1.5">
+        <i class="fa-solid fa-gear text-xs"></i> Editar
+      </button>
+    </header>
+
+    <!-- Navigation Tabs -->
+    <nav class="grid grid-cols-3 gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800 mb-5">
+      <button onclick="switchTab('workout')" id="tab-btn-workout" class="py-2 text-xs font-semibold rounded-lg bg-red-600 text-white shadow">Rutina</button>
+      <button onclick="switchTab('metrics')" id="tab-btn-metrics" class="py-2 text-xs font-semibold rounded-lg text-slate-400 hover:text-white">Métricas</button>
+      <button onclick="switchTab('body')" id="tab-btn-body" class="py-2 text-xs font-semibold rounded-lg text-slate-400 hover:text-white">Peso Corp.</button>
+    </nav>
+
+    <!-- TAB: WORKOUT -->
+    <div id="tab-workout" class="space-y-4">
+      <!-- Controls Header -->
+      <div class="bg-slate-900 p-3 rounded-xl border border-slate-800 space-y-3">
+        <!-- Week Selector -->
+        <div class="flex items-center justify-between">
+          <label class="text-xs font-semibold text-slate-300">Semana del ciclo:</label>
+          <select id="week-select" onchange="changeWeek()" class="bg-slate-800 border border-slate-700 text-white text-xs rounded-lg px-2.5 py-1.5 focus:ring-1 focus:ring-red-500">
+            <option value="1">Semana 1</option>
+            <option value="2">Semana 2</option>
+            <option value="3">Semana 3</option>
+            <option value="4">Semana 4</option>
+            <option value="5">Semana 5</option>
+            <option value="6">Semana 6</option>
+            <option value="7">Semana 7</option>
+            <option value="8">Semana 8</option>
+            <option value="9">Semana 9 (DESCARGA)</option>
+          </select>
+        </div>
+
+        <!-- Day Tabs (Red Highlighted Active State) -->
+        <div class="flex overflow-x-auto gap-1 pb-1 scrollbar-none" id="days-nav">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+
+      <!-- Semana 9 Banner -->
+      <div id="descarga-banner" class="hidden bg-emerald-950/60 border border-emerald-500/40 p-4 rounded-xl text-center space-y-2">
+        <div class="text-emerald-400 font-bold text-sm"><i class="fa-solid fa-battery-charging mr-1"></i> ¡Semana 9: Descarga Deload!</div>
+        <p class="text-xs text-slate-300">Felicidades por completar 8 semanas intensas. Reduce los pesos un 40-50% o descansa totalmente para supercompensar.</p>
+        <button onclick="openPinModal('resetCycle')" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold py-1.5 px-3 rounded-lg">Reiniciar a Semana 1</button>
+      </div>
+
+      <!-- Daily Routine Container -->
+      <div id="workout-list" class="space-y-4">
+        <!-- Exercises populated by JS -->
+      </div>
+    </div>
+
+    <!-- TAB: METRICS -->
+    <div id="tab-metrics" class="hidden space-y-4">
+      <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl space-y-2">
+        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400">Resumen de Hoy</h3>
+        <div class="grid grid-cols-3 gap-2 text-center pt-1">
+          <div class="bg-slate-950 p-2 rounded-lg border border-slate-800">
+            <div class="text-xs text-slate-400">Volumen</div>
+            <div id="metric-today-vol" class="text-sm font-bold text-white">0 kg</div>
+          </div>
+          <div class="bg-slate-950 p-2 rounded-lg border border-slate-800">
+            <div class="text-xs text-slate-400">Series</div>
+            <div id="metric-today-sets" class="text-sm font-bold text-red-400">0</div>
+          </div>
+          <div class="bg-slate-950 p-2 rounded-lg border border-slate-800">
+            <div class="text-xs text-slate-400">Calorías Est.</div>
+            <div id="metric-today-cal" class="text-sm font-bold text-amber-400">0 kcal</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl space-y-3">
+        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400">Volumen Total por Semana (Kg)</h3>
+        <div class="h-48">
+          <canvas id="volumeChart"></canvas>
+        </div>
+      </div>
+
+      <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl space-y-3">
+        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400">Estadísticas del Ciclo</h3>
+        <div class="grid grid-cols-2 gap-2">
+          <div class="bg-slate-950 p-3 rounded-lg border border-slate-800">
+            <div class="text-xs text-slate-400">Tonelaje Total</div>
+            <div id="stat-total-tonnage" class="text-base font-extrabold text-white">0 kg</div>
+          </div>
+          <div class="bg-slate-950 p-3 rounded-lg border border-slate-800">
+            <div class="text-xs text-slate-400">Sesiones Registradas</div>
+            <div id="stat-total-workouts" class="text-base font-extrabold text-white">0</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-gradient-to-r from-red-950/40 to-slate-900 border border-red-900/40 p-4 rounded-xl space-y-2">
+        <div class="flex items-center gap-2 text-red-400 font-bold text-sm">
+          <i class="fa-solid fa-user-ninja"></i> Consejos de tu Entrenador
+        </div>
+        <p class="text-xs text-slate-300 leading-relaxed" id="coach-tip">
+          Recuerda aplicar sobrecarga progresiva en cada sesión. Si mantienes las repeticiones pero aumentas aunque sea 1 kg, estás ganando masa muscular.
+        </p>
+      </div>
+
+      <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl space-y-3">
+        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400">Copias de Seguridad y Datos</h3>
+        <div class="grid grid-cols-2 gap-2">
+          <button onclick="exportCSV()" class="bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold py-2 px-3 rounded-lg border border-slate-700 flex items-center justify-center gap-1.5">
+            <i class="fa-solid fa-file-csv text-emerald-400"></i> Reporte CSV
+          </button>
+          <button onclick="exportJSON()" class="bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold py-2 px-3 rounded-lg border border-slate-700 flex items-center justify-center gap-1.5">
+            <i class="fa-solid fa-download text-blue-400"></i> Respaldar JSON
+          </button>
+        </div>
+        <div class="pt-2 border-t border-slate-800 flex justify-between items-center">
+          <label class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium py-1.5 px-3 rounded-lg border border-slate-700 cursor-pointer">
+            <i class="fa-solid fa-upload mr-1"></i> Importar Backup
+            <input type="file" id="import-file" accept=".json" onchange="importJSON(event)" class="hidden">
+          </label>
+          <button onclick="openPinModal('clearAll')" class="text-xs text-red-400 hover:text-red-300">
+            <i class="fa-solid fa-trash mr-1"></i> Resetear Todo
+          </button>
+        </div>
+      </div>
+
+      <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl space-y-2">
+        <div class="flex justify-between items-center">
+          <div>
+            <div class="text-xs font-bold text-white"><i class="fa-solid fa-cloud text-sky-400 mr-1.5"></i> Sincronización en la Nube</div>
+            <div class="text-[10px] text-slate-400" id="cloud-status-text">Desconectado (Solo Local)</div>
+          </div>
+          <button onclick="toggleCloudConfig()" class="bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold py-1 px-2.5 rounded-lg">Configurar</button>
+        </div>
+        
+        <div id="cloud-config-box" class="hidden pt-3 border-t border-slate-800 space-y-2 text-xs">
+          <p class="text-slate-400 text-[11px]">Pega las credenciales Firebase Firestore para sincronizar entre dispositivos:</p>
+          <textarea id="firebase-config-input" rows="3" placeholder='{"apiKey": "...", "projectId": "..."}' class="w-full bg-slate-950 border border-slate-800 rounded p-2 text-slate-200 text-[10px] font-mono"></textarea>
+          <button onclick="saveFirebaseConfig()" class="w-full bg-slate-800 hover:bg-slate-700 text-white font-semibold py-1 rounded border border-slate-700">Conectar Nube</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: BODY WEIGHT -->
+    <div id="tab-body" class="hidden space-y-4">
+      <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl space-y-4">
+        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400">Control de Peso Corporal (Ciclo 8 Semanas)</h3>
+        
+        <div class="grid grid-cols-2 gap-3">
+          <div class="bg-slate-950 p-3 rounded-lg border border-slate-800 space-y-1">
+            <label class="text-[11px] font-medium text-slate-400">Inicio (Semana 1)</label>
+            <div class="flex items-center gap-1">
+              <input type="number" step="0.1" id="body-start" onchange="saveBodyWeights()" placeholder="0.0" class="w-full bg-slate-900 border border-slate-700 text-white text-sm font-bold rounded px-2 py-1">
+              <span class="text-xs text-slate-400">kg</span>
+            </div>
+          </div>
+
+          <div class="bg-slate-950 p-3 rounded-lg border border-slate-800 space-y-1">
+            <label class="text-[11px] font-medium text-slate-400">Final (Semana 8)</label>
+            <div class="flex items-center gap-1">
+              <input type="number" step="0.1" id="body-end" onchange="saveBodyWeights()" placeholder="0.0" class="w-full bg-slate-900 border border-slate-700 text-white text-sm font-bold rounded px-2 py-1">
+              <span class="text-xs text-slate-400">kg</span>
+            </div>
+          </div>
+        </div>
+
+        <div id="body-diff-card" class="bg-slate-950 p-3 rounded-lg border border-slate-800 text-center">
+          <span class="text-xs text-slate-400">Diferencia Neta de Peso:</span>
+          <div id="body-diff-val" class="text-lg font-bold text-slate-300">-- kg</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Floating Timer Modal/Bar -->
+  <div id="timer-bar" class="fixed bottom-4 left-4 right-4 max-w-md mx-auto bg-slate-900/95 border border-red-500/50 shadow-2xl rounded-2xl p-3 flex items-center justify-between z-50 transform transition-transform duration-300 translate-y-32">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-full bg-red-600/20 border border-red-500 flex items-center justify-center text-red-500 font-bold text-lg" id="timer-display">
+        02:30
+      </div>
+      <div>
+        <div class="text-xs font-bold text-white">Descanso Activo</div>
+        <div class="text-[10px] text-slate-400" id="timer-quote">¡Hidrátate y mentalízate!</div>
+      </div>
+    </div>
+    <div class="flex items-center gap-1">
+      <button onclick="addTimerTime(30)" class="bg-slate-800 hover:bg-slate-700 text-xs px-2 py-1 rounded text-slate-300 font-medium">+30s</button>
+      <button onclick="closeTimer()" class="bg-red-600 hover:bg-red-500 text-white text-xs px-2.5 py-1 rounded font-bold">Omitir</button>
+    </div>
+  </div>
+
+  <!-- PIN Modal -->
+  <div id="pin-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 max-w-xs w-full space-y-4">
+      <div class="text-center">
+        <i class="fa-solid fa-lock text-red-500 text-2xl mb-1"></i>
+        <h3 class="text-sm font-bold text-white">Se requiere Clave</h3>
+        <p class="text-xs text-slate-400">Ingresa la clave de administración (2424)</p>
+      </div>
+      <input type="password" id="pin-input" maxlength="4" placeholder="••••" class="w-full text-center bg-slate-950 border border-slate-700 text-white text-lg tracking-widest rounded-lg p-2 focus:ring-1 focus:ring-red-500">
+      <div class="flex gap-2">
+        <button onclick="closePinModal()" class="flex-1 bg-slate-800 text-slate-300 py-1.5 rounded-lg text-xs font-semibold">Cancelar</button>
+        <button onclick="verifyPin()" class="flex-1 bg-red-600 text-white py-1.5 rounded-lg text-xs font-bold">Confirmar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit Routine Modal -->
+  <div id="edit-routine-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 max-w-md w-full space-y-3 max-h-[85vh] flex flex-col">
+      <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+        <h3 class="text-sm font-bold text-white">Editar Ejercicios de la Rutina</h3>
+        <button onclick="closeEditModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      
+      <div class="flex gap-1 bg-slate-950 p-1 rounded-lg" id="edit-day-tabs">
+        <!-- populated by JS -->
+      </div>
+
+      <div id="edit-exercises-list" class="flex-1 overflow-y-auto space-y-2 pr-1">
+        <!-- exercises editor -->
+      </div>
+
+      <div class="pt-2 border-t border-slate-800 flex justify-between gap-2">
+        <button onclick="addNewExerciseField()" class="bg-slate-800 text-slate-300 text-xs px-3 py-1.5 rounded-lg font-medium"><i class="fa-solid fa-plus mr-1"></i> Agregar Ejercicio</button>
+        <button onclick="saveRoutineChanges()" class="bg-red-600 hover:bg-red-500 text-white text-xs px-4 py-1.5 rounded-lg font-bold">Guardar Cambios</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- JavaScript App Engine -->
+  <script>
+    const DEFAULT_ROUTINE = {
+      lunes: [
+        "Press Inclinado con barra",
+        "Vuelos Laterales sentado",
+        "Press francés con barra W",
+        "Maquina Fly Pecho",
+        "Triceps Polea Alta",
+        "Fondos"
+      ],
+      martes: [
+        "Pull over",
+        "Curl Inclinado Biceps",
+        "Dominadas",
+        "Posterior en polea",
+        "Remo en barra T",
+        "Predicador unilateral con mancuerna",
+        "Antebrazo Prono (Polea hacia abajo)",
+        "Antebrazo Supino (Polea hacia arriba)"
+      ],
+      miercoles: [
+        "Aductor",
+        "Peso Muerto",
+        "Bulgara gluteo en smith",
+        "Curl isquiotibial unilateral",
+        "Extensor Cuadriceps",
+        "Gastrocnemios sentado en maquina"
+      ],
+      jueves: [
+        "Vuelos Laterales sentado",
+        "Press francés con barra W",
+        "Curl Inclinado Biceps",
+        "Press Militar con mancuernas sentado",
+        "Predicador en maquina",
+        "Triceps Polea Alta unilateral",
+        "Antebrazo Prono (Polea hacia abajo)",
+        "Antebrazo Supino (Polea hacia arriba)"
+      ],
+      viernes: [
+        "Press plano con barra",
+        "Pull over",
+        "Press Inclinado con mancuernas",
+        "Jalón al pecho",
+        "Maquina Fly Pecho",
+        "Remo en barra T"
+      ],
+      sabado: [
+        "Aductor",
+        "Sentadilla en Hack squat",
+        "Prensa",
+        "Curl isquiotibial unilateral",
+        "Extensor Cuadriceps",
+        "Gastrocnemios en maquina sentado"
+      ]
+    };
+
+    // Muscle Targets Database Mapping (Punto 4)
+    const MUSCLE_TARGETS = {
+      "Press Inclinado con barra": "Pecho Superior / Hombro Anterior",
+      "Vuelos Laterales sentado": "Hombro (Deltoides Lateral)",
+      "Press francés con barra W": "Tríceps (Cabeza Larga)",
+      "Maquina Fly Pecho": "Pecho (Pectoral Mayor)",
+      "Triceps Polea Alta": "Tríceps",
+      "Fondos": "Pecho Inferior / Tríceps",
+      "Pull over": "Dorsales / Pecho",
+      "Curl Inclinado Biceps": "Bíceps (Cabeza Larga)",
+      "Dominadas": "Espalda / Dorsal Ancho",
+      "Posterior en polea": "Hombro Posterior",
+      "Remo en barra T": "Espalda Media / Dorsales",
+      "Predicador unilateral con mancuerna": "Bíceps (Aislamiento)",
+      "Antebrazo Prono (Polea hacia abajo)": "Antebrazo (Extensores)",
+      "Antebrazo Supino (Polea hacia arriba)": "Antebrazo (Flexores)",
+      "Aductor": "Pierna (Cadera / Aductores)",
+      "Peso Muerto": "Cadena Posterior / Isquios / Glúteos",
+      "Bulgara gluteo en smith": "Glúteos / Cuádriceps",
+      "Curl isquiotibial unilateral": "Isquiotibiales",
+      "Extensor Cuadriceps": "Cuádriceps",
+      "Gastrocnemios sentado en maquina": "Pantorrillas (Sóleo / Gastrocnemio)",
+      "Press Militar con mancuernas sentado": "Hombros (Deltoides)",
+      "Predicador en maquina": "Bíceps",
+      "Triceps Polea Alta unilateral": "Tríceps (Unilateral)",
+      "Press plano con barra": "Pecho Global / Tríceps",
+      "Press Inclinado con mancuernas": "Pecho Superior",
+      "Jalón al pecho": "Espalda (Dorsal Ancho)",
+      "Sentadilla en Hack squat": "Cuádriceps / Glúteos",
+      "Prensa": "Cuádriceps / Pierna General"
+    };
+
+    const DAYS_KEYS = ["lunes", "martes", "miercoles", "jueves", "viernes", "sabado"];
+    const DAYS_NAMES = { lunes: "Lunes", martes: "Martes", miercoles: "Miércoles", jueves: "Jueves", viernes: "Viernes", sabado: "Sábado" };
+    const MOTIVATION_QUOTES = [
+      "¡Excelente serie! Hidrátate y respira profundo.",
+      "La sobrecarga progresiva se construye serie a serie. ¡Vamos!",
+      "Recupera tus pulsaciones. La siguiente serie exige máxima intensidad.",
+      "2:30 minutos para reponer ATP. Mantén el foco mental.",
+      "Visualiza la técnica perfecta para tu próxima serie."
+    ];
+
+    let currentWeek = 1;
+    let currentDay = "lunes";
+    let routine = JSON.parse(localStorage.getItem('gympro_routine')) || DEFAULT_ROUTINE;
+    let workoutData = JSON.parse(localStorage.getItem('gympro_logs')) || {};
+    let bodyData = JSON.parse(localStorage.getItem('gympro_body')) || { start: '', end: '' };
+    let activeActionTarget = null;
+    let activeEditDay = "lunes";
+    let timerInterval = null;
+    let timerSecondsLeft = 0;
+    let volumeChartInstance = null;
+    let db = null;
+
+    const KG_TO_LB = 2.20462;
+
+    document.addEventListener("DOMContentLoaded", () => {
+      initDaysNav();
+      loadBodyWeights();
+      renderWorkout();
+      updateStickyProgress();
+      initFirebaseFromStorage();
+    });
+
+    function switchTab(tab) {
+      ['workout', 'metrics', 'body'].forEach(t => {
+        document.getElementById(`tab-${t}`).classList.add('hidden');
+        document.getElementById(`tab-btn-${t}`).className = "py-2 text-xs font-semibold rounded-lg text-slate-400 hover:text-white";
+      });
+      document.getElementById(`tab-${tab}`).classList.remove('hidden');
+      document.getElementById(`tab-btn-${tab}`).className = "py-2 text-xs font-semibold rounded-lg bg-red-600 text-white shadow";
+      
+      if (tab === 'metrics') renderMetrics();
+    }
+
+    // Punto 2: Selector de día resaltado en color rojo dominante
+    function initDaysNav() {
+      const nav = document.getElementById('days-nav');
+      nav.innerHTML = DAYS_KEYS.map(day => `
+        <button onclick="changeDay('${day}')" id="day-btn-${day}" class="px-3.5 py-1.5 rounded-lg text-xs font-bold shrink-0 transition-all shadow-sm ${day === currentDay ? 'bg-red-600 text-white ring-2 ring-red-500/50' : 'bg-slate-800 text-slate-400 hover:text-slate-200'}">
+          ${DAYS_NAMES[day]}
+        </button>
+      `).join('');
+    }
+
+    function changeDay(day) {
+      currentDay = day;
+      initDaysNav();
+      renderWorkout();
+      updateStickyProgress();
+    }
+
+    function changeWeek() {
+      currentWeek = parseInt(document.getElementById('week-select').value);
+      document.getElementById('descarga-banner').classList.toggle('hidden', currentWeek !== 9);
+      renderWorkout();
+      updateStickyProgress();
+    }
+
+    function getWeightInKg(val, unit) {
+      if (!val || isNaN(val)) return 0;
+      return unit === 'lb' ? val / KG_TO_LB : val;
+    }
+
+    function renderWorkout() {
+      document.getElementById('sticky-day').textContent = DAYS_NAMES[currentDay].toUpperCase();
+      const list = document.getElementById('workout-list');
+      const dayExercises = routine[currentDay] || [];
+
+      if (dayExercises.length === 0) {
+        list.innerHTML = `<div class="text-center text-slate-500 py-8 text-xs">No hay ejercicios configurados para este día.</div>`;
+        return;
+      }
+
+      list.innerHTML = dayExercises.map((exName, exIdx) => {
+        const exKey = `${currentWeek}_${currentDay}_${exIdx}`;
+        const prevExKey = `${currentWeek - 1}_${currentDay}_${exIdx}`;
+        const currentData = workoutData[exKey] || { sets: [{}, {}, {}], notes: '' };
+        const prevData = workoutData[prevExKey];
+        const muscleGroup = MUSCLE_TARGETS[exName] || "Musculatura General";
+
+        let prevStatsHtml = '<span class="text-slate-500">Primera semana o sin registro previo</span>';
+        if (prevData && prevData.sets) {
+          const prevSummary = prevData.sets.map(s => `${s.weight || 0}${s.unit || 'kg'}x${s.reps || 0}`).join(', ');
+          prevStatsHtml = `<span class="text-amber-400/90 font-medium"><i class="fa-solid fa-clock-rotate-left mr-1"></i>Semana ${currentWeek - 1}: ${prevSummary}</span>`;
+        }
+
+        // Punto 3: Cálculo de % de mejora/reducción y mensaje de consejo del coach
+        let performanceBadge = '';
+        let coachAdviceText = '';
+        if (prevData && currentData.sets) {
+          const currentVol = calculateExerciseVolume(currentData);
+          const prevVol = calculateExerciseVolume(prevData);
+          if (currentVol > 0 && prevVol > 0) {
+            const diffPct = Math.round(((currentVol - prevVol) / prevVol) * 100);
+            if (diffPct > 0) {
+              performanceBadge = `<span class="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1"><i class="fa-solid fa-arrow-up text-[9px]"></i> +${diffPct}%</span>`;
+              coachAdviceText = `<div class="text-[10px] text-emerald-400 font-medium mt-1"><i class="fa-solid fa-fire mr-1"></i>¡Excelente sobrecarga progresiva! Aumentaste el rendimiento.</div>`;
+            } else if (diffPct === 0) {
+              performanceBadge = `<span class="bg-amber-500/20 text-amber-400 border border-amber-500/30 text-[10px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1"><i class="fa-solid fa-equals text-[9px]"></i> 0%</span>`;
+              coachAdviceText = `<div class="text-[10px] text-amber-400 font-medium mt-1"><i class="fa-solid fa-shield mr-1"></i>Rendimiento mantenido. Intenta agregar 1 rep en la última serie la próxima vez.</div>`;
+            } else {
+              performanceBadge = `<span class="bg-red-500/20 text-red-400 border border-red-500/30 text-[10px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1"><i class="fa-solid fa-arrow-down text-[9px]"></i> ${diffPct}%</span>`;
+              coachAdviceText = `<div class="text-[10px] text-red-400 font-medium mt-1"><i class="fa-solid fa-heart-pulse mr-1"></i>Rendimiento reducido. Revisa tu descanso, nutrición o fatiga acumulada.</div>`;
+            }
+          }
+        }
+
+        return `
+          <div class="bg-slate-900 border border-slate-800 rounded-xl p-3.5 space-y-3 shadow-lg">
+            <!-- Exercise Header -->
+            <div class="flex items-start justify-between gap-2 border-b border-slate-800/80 pb-2">
+              <div>
+                <h4 class="text-sm font-bold text-white flex items-center gap-1.5">
+                  <span class="w-2 h-2 rounded-full bg-red-500"></span> ${exName}
+                </h4>
+                <!-- Punto 4: Grupo Muscular Objetivo justo debajo -->
+                <div class="text-[10px] text-red-400/90 font-semibold tracking-wide uppercase mt-0.5">
+                  <i class="fa-solid fa-bullseye text-[9px] mr-1"></i>${muscleGroup}
+                </div>
+                <div class="text-[11px] mt-1">${prevStatsHtml}</div>
+                ${coachAdviceText}
+              </div>
+              <div class="flex items-center gap-1">
+                ${performanceBadge}
+                <button onclick="copySet1ToAll('${currentDay}', ${exIdx})" title="Copiar Serie 1 a 2 y 3" class="text-slate-400 hover:text-amber-400 text-xs px-2 py-1 rounded bg-slate-800 border border-slate-700">
+                  <i class="fa-solid fa-clone mr-1"></i>1➔2,3
+                </button>
+              </div>
+            </div>
+
+            <!-- Sets Rows -->
+            <div class="space-y-2">
+              ${[0, 1, 2].map(sIdx => {
+                const setObj = (currentData.sets && currentData.sets[sIdx]) || { weight: '', reps: '', unit: 'kg', done: false };
+                const unit = setObj.unit || 'kg';
+                const weightVal = parseFloat(setObj.weight) || 0;
+                
+                // Punto 1: Conversión siempre visible debajo del botón de unidad
+                let convertedSubtext = '--';
+                if (weightVal > 0) {
+                  if (unit === 'kg') {
+                    convertedSubtext = `${(weightVal * KG_TO_LB).toFixed(1)} lb`;
+                  } else {
+                    convertedSubtext = `${(weightVal / KG_TO_LB).toFixed(1)} kg`;
+                  }
+                }
+
+                return `
+                  <div class="flex items-center justify-between gap-2 bg-slate-950 p-2 rounded-lg border border-slate-800/60">
+                    <span class="text-xs font-bold text-slate-400 w-8">S${sIdx + 1}</span>
+                    
+                    <!-- Input Peso + Unidad + Conversión visible siempre -->
+                    <div class="flex-1 flex items-center gap-1.5">
+                      <input type="number" step="0.5" placeholder="Peso" value="${setObj.weight !== undefined ? setObj.weight : ''}" 
+                        onchange="updateSet('${currentDay}', ${exIdx}, ${sIdx}, 'weight', this.value)"
+                        class="w-16 bg-slate-900 border border-slate-700 text-white text-xs font-semibold rounded px-2 py-1 text-center focus:ring-1 focus:ring-red-500">
+                      
+                      <div class="flex flex-col items-center">
+                        <button onclick="toggleUnit('${currentDay}', ${exIdx}, ${sIdx})" class="text-[10px] font-bold px-1.5 py-0.5 rounded border ${unit === 'kg' ? 'bg-red-950 text-red-400 border-red-800' : 'bg-blue-950 text-blue-400 border-blue-800'}">
+                          ${unit.toUpperCase()}
+                        </button>
+                        <span class="text-[9px] text-slate-400 font-mono mt-0.5">${convertedSubtext}</span>
+                      </div>
+                    </div>
+
+                    <!-- Input Reps -->
+                    <div class="w-16">
+                      <input type="number" placeholder="Reps" value="${setObj.reps !== undefined ? setObj.reps : ''}"
+                        onchange="updateSet('${currentDay}', ${exIdx}, ${sIdx}, 'reps', this.value)"
+                        class="w-full bg-slate-900 border border-slate-700 text-white text-xs font-semibold rounded px-2 py-1 text-center focus:ring-1 focus:ring-red-500">
+                    </div>
+
+                    <!-- Checkbox Done -->
+                    <button onclick="toggleSetDone('${currentDay}', ${exIdx}, ${sIdx})" class="w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${setObj.done ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-500 border border-slate-700'}">
+                      <i class="fa-solid fa-check text-xs"></i>
+                    </button>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+
+            <!-- Notes Section -->
+            <div class="pt-1">
+              <input type="text" placeholder="+ Nota u observación (ej. Máquina pos. 4)..." value="${currentData.notes || ''}"
+                onchange="updateNotes('${currentDay}', ${exIdx}, this.value)"
+                class="w-full bg-slate-950/50 border border-slate-800/80 text-slate-300 text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-slate-700">
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function getExData(day, exIdx) {
+      const key = `${currentWeek}_${day}_${exIdx}`;
+      if (!workoutData[key]) {
+        workoutData[key] = { sets: [{ unit: 'kg' }, { unit: 'kg' }, { unit: 'kg' }], notes: '' };
+      }
+      return workoutData[key];
+    }
+
+    // Punto 5: Validación e inicio de temporizador al escribir Peso y Reps
+    function updateSet(day, exIdx, setIdx, field, val) {
+      const data = getExData(day, exIdx);
+      const parsedVal = val === '' ? '' : parseFloat(val);
+      data.sets[setIdx][field] = parsedVal;
+      
+      const setObj = data.sets[setIdx];
+      // Si ambos campos (peso y repeticiones) tienen valor, se autocompleta la serie
+      if (setObj.weight !== '' && setObj.weight !== undefined && setObj.reps !== '' && setObj.reps !== undefined) {
+        if (!setObj.done) {
+          setObj.done = true;
+          startRestTimer(150); // Activa temporizador de 2:30 min
+        }
+      }
+
+      saveWorkoutData();
+      renderWorkout();
+      updateStickyProgress();
+    }
+
+    function toggleUnit(day, exIdx, setIdx) {
+      const data = getExData(day, exIdx);
+      const current = data.sets[setIdx].unit || 'kg';
+      data.sets[setIdx].unit = current === 'kg' ? 'lb' : 'kg';
+      saveWorkoutData();
+      renderWorkout();
+    }
+
+    function toggleSetDone(day, exIdx, setIdx) {
+      const data = getExData(day, exIdx);
+      data.sets[setIdx].done = !data.sets[setIdx].done;
+      saveWorkoutData();
+      renderWorkout();
+      updateStickyProgress();
+
+      if (data.sets[setIdx].done) {
+        startRestTimer(150);
+      }
+    }
+
+    function copySet1ToAll(day, exIdx) {
+      const data = getExData(day, exIdx);
+      const s1 = data.sets[0] || {};
+      if (s1.weight === undefined && s1.reps === undefined) return;
+      
+      const isAutoDone = s1.weight !== '' && s1.reps !== '';
+      data.sets[1] = { ...data.sets[1], weight: s1.weight, reps: s1.reps, unit: s1.unit || 'kg', done: isAutoDone };
+      data.sets[2] = { ...data.sets[2], weight: s1.weight, reps: s1.reps, unit: s1.unit || 'kg', done: isAutoDone };
+      
+      saveWorkoutData();
+      renderWorkout();
+      updateStickyProgress();
+    }
+
+    function updateNotes(day, exIdx, text) {
+      const data = getExData(day, exIdx);
+      data.notes = text;
+      saveWorkoutData();
+    }
+
+    function saveWorkoutData() {
+      localStorage.setItem('gympro_logs', JSON.stringify(workoutData));
+      syncToFirebase();
+    }
+
+    function updateStickyProgress() {
+      const dayExercises = routine[currentDay] || [];
+      let totalSets = dayExercises.length * 3;
+      let completedSets = 0;
+      let dailyTonnageKg = 0;
+
+      dayExercises.forEach((_, exIdx) => {
+        const key = `${currentWeek}_${currentDay}_${exIdx}`;
+        const ex = workoutData[key];
+        if (ex && ex.sets) {
+          ex.sets.forEach(s => {
+            if (s.done) completedSets++;
+            if (s.weight && s.reps) {
+              const weightKg = getWeightInKg(parseFloat(s.weight), s.unit || 'kg');
+              dailyTonnageKg += weightKg * parseFloat(s.reps);
+            }
+          });
+        }
+      });
+
+      const pct = totalSets > 0 ? Math.round((completedSets / totalSets) * 100) : 0;
+      document.getElementById('sticky-progress-fill').style.width = `${pct}%`;
+      document.getElementById('sticky-completed-text').textContent = `${completedSets}/${totalSets} series`;
+
+      const estKcal = Math.round((dailyTonnageKg * 0.04) + (completedSets * 8));
+      document.getElementById('sticky-cal').innerHTML = `<i class="fa-solid fa-fire text-xs mr-1"></i>${estKcal} kcal`;
+    }
+
+    function startRestTimer(seconds) {
+      clearInterval(timerInterval);
+      timerSecondsLeft = seconds;
+      
+      const timerBar = document.getElementById('timer-bar');
+      timerBar.classList.remove('translate-y-32');
+      
+      const randomQuote = MOTIVATION_QUOTES[Math.floor(Math.random() * MOTIVATION_QUOTES.length)];
+      document.getElementById('timer-quote').textContent = randomQuote;
+      
+      updateTimerDisplay();
+      timerInterval = setInterval(() => {
+        timerSecondsLeft--;
+        if (timerSecondsLeft <= 0) {
+          clearInterval(timerInterval);
+          closeTimer();
+          if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+        } else {
+          updateTimerDisplay();
+        }
+      }, 1000);
+    }
+
+    function updateTimerDisplay() {
+      const m = Math.floor(timerSecondsLeft / 60).toString().padStart(2, '0');
+      const s = (timerSecondsLeft % 60).toString().padStart(2, '0');
+      document.getElementById('timer-display').textContent = `${m}:${s}`;
+    }
+
+    function addTimerTime(sec) {
+      timerSecondsLeft += sec;
+      updateTimerDisplay();
+    }
+
+    function closeTimer() {
+      clearInterval(timerInterval);
+      document.getElementById('timer-bar').classList.add('translate-y-32');
+    }
+
+    function loadBodyWeights() {
+      document.getElementById('body-start').value = bodyData.start || '';
+      document.getElementById('body-end').value = bodyData.end || '';
+      calcBodyDiff();
+    }
+
+    function saveBodyWeights() {
+      bodyData.start = document.getElementById('body-start').value;
+      bodyData.end = document.getElementById('body-end').value;
+      localStorage.setItem('gympro_body', JSON.stringify(bodyData));
+      calcBodyDiff();
+      syncToFirebase();
+    }
+
+    function calcBodyDiff() {
+      const s = parseFloat(bodyData.start);
+      const e = parseFloat(bodyData.end);
+      const diffBox = document.getElementById('body-diff-val');
+
+      if (!isNaN(s) && !isNaN(e)) {
+        const diff = (e - s).toFixed(1);
+        const lbDiff = (diff * KG_TO_LB).toFixed(1);
+        const sign = diff > 0 ? '+' : '';
+        diffBox.textContent = `${sign}${diff} kg (${sign}${lbDiff} lb)`;
+        diffBox.className = `text-lg font-bold ${diff < 0 ? 'text-emerald-400' : 'text-amber-400'}`;
+      } else {
+        diffBox.textContent = '-- kg';
+        diffBox.className = 'text-lg font-bold text-slate-300';
+      }
+    }
+
+    function calculateExerciseVolume(exData) {
+      if (!exData || !exData.sets) return 0;
+      return exData.sets.reduce((total, s) => {
+        if (!s.weight || !s.reps) return total;
+        const wKg = getWeightInKg(parseFloat(s.weight), s.unit || 'kg');
+        return total + (wKg * parseFloat(s.reps));
+      }, 0);
+    }
+
+    function renderMetrics() {
+      let totalCycleTonnage = 0;
+      let totalWorkoutsCount = 0;
+      const weeklyVolumes = [0, 0, 0, 0, 0, 0, 0, 0, 0];
+
+      Object.keys(workoutData).forEach(key => {
+        const parts = key.split('_');
+        const wk = parseInt(parts[0]);
+        const exData = workoutData[key];
+        const vol = calculateExerciseVolume(exData);
+
+        if (vol > 0) {
+          totalCycleTonnage += vol;
+          if (wk >= 1 && wk <= 9) {
+            weeklyVolumes[wk - 1] += vol;
+          }
+        }
+      });
+
+      const sessions = new Set();
+      Object.keys(workoutData).forEach(k => {
+        const ex = workoutData[k];
+        if (ex.sets && ex.sets.some(s => s.done || s.weight)) {
+          const parts = k.split('_');
+          sessions.add(`${parts[0]}_${parts[1]}`);
+        }
+      });
+      totalWorkoutsCount = sessions.size;
+
+      document.getElementById('stat-total-tonnage').textContent = `${Math.round(totalCycleTonnage).toLocaleString()} kg`;
+      document.getElementById('stat-total-workouts').textContent = totalWorkoutsCount;
+
+      let todayVol = 0;
+      let todaySets = 0;
+      const dayExercises = routine[currentDay] || [];
+      dayExercises.forEach((_, exIdx) => {
+        const key = `${currentWeek}_${currentDay}_${exIdx}`;
+        const exData = workoutData[key];
+        if (exData && exData.sets) {
+          exData.sets.forEach(s => {
+            if (s.done) todaySets++;
+            if (s.weight && s.reps) {
+              const w = getWeightInKg(parseFloat(s.weight), s.unit || 'kg');
+              todayVol += (w * parseFloat(s.reps));
+            }
+          });
+        }
+      });
+
+      document.getElementById('metric-today-vol').textContent = `${Math.round(todayVol)} kg`;
+      document.getElementById('metric-today-sets').textContent = todaySets;
+      document.getElementById('metric-today-cal').textContent = `${Math.round((todayVol * 0.04) + (todaySets * 8))} kcal`;
+
+      renderChart(weeklyVolumes);
+    }
+
+    function renderChart(weeklyVolumes) {
+      const ctx = document.getElementById('volumeChart').getContext('2d');
+      if (volumeChartInstance) volumeChartInstance.destroy();
+
+      volumeChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: ['S1', 'S2', 'S3', 'S4', 'S5', 'S6', 'S7', 'S8', 'Descarga'],
+          datasets: [{
+            label: 'Volumen (kg)',
+            data: weeklyVolumes,
+            backgroundColor: weeklyVolumes.map((_, i) => i === 8 ? 'rgba(16, 185, 129, 0.6)' : 'rgba(239, 68, 68, 0.7)'),
+            borderColor: weeklyVolumes.map((_, i) => i === 8 ? '#10B981' : '#EF4444'),
+            borderWidth: 1.5,
+            borderRadius: 6
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { grid: { display: false }, ticks: { color: '#94A3B8', font: { size: 10 } } },
+            y: { grid: { color: '#1E293B' }, ticks: { color: '#94A3B8', font: { size: 10 } } }
+          }
+        }
+      });
+    }
+
+    function openPinModal(actionTarget) {
+      activeActionTarget = actionTarget;
+      document.getElementById('pin-input').value = '';
+      document.getElementById('pin-modal').classList.remove('hidden');
+    }
+
+    function closePinModal() {
+      document.getElementById('pin-modal').classList.add('hidden');
+    }
+
+    function verifyPin() {
+      const input = document.getElementById('pin-input').value;
+      if (input === '2424') {
+        closePinModal();
+        if (activeActionTarget === 'edit') {
+          openEditModal();
+        } else if (activeActionTarget === 'clearAll') {
+          if (confirm("¿Seguro que deseas reiniciar todos los datos registrados? Se borrarán logs y pesos.")) {
+            localStorage.clear();
+            workoutData = {};
+            bodyData = { start: '', end: '' };
+            routine = DEFAULT_ROUTINE;
+            location.reload();
+          }
+        } else if (activeActionTarget === 'resetCycle') {
+          currentWeek = 1;
+          document.getElementById('week-select').value = '1';
+          changeWeek();
+        }
+      } else {
+        alert('Clave incorrecta. La clave es 2424.');
+      }
+    }
+
+    function openEditModal() {
+      activeEditDay = currentDay;
+      renderEditModalTabs();
+      renderEditExercises();
+      document.getElementById('edit-routine-modal').classList.remove('hidden');
+    }
+
+    function closeEditModal() {
+      document.getElementById('edit-routine-modal').classList.add('hidden');
+    }
+
+    function renderEditModalTabs() {
+      const tabs = document.getElementById('edit-day-tabs');
+      tabs.innerHTML = DAYS_KEYS.map(day => `
+        <button onclick="switchEditDay('${day}')" class="flex-1 py-1 text-[11px] font-bold rounded ${day === activeEditDay ? 'bg-red-600 text-white' : 'text-slate-400'}">
+          ${DAYS_NAMES[day].substring(0,3)}
+        </button>
+      `).join('');
+    }
+
+    function switchEditDay(day) {
+      activeEditDay = day;
+      renderEditModalTabs();
+      renderEditExercises();
+    }
+
+    function renderEditExercises() {
+      const container = document.getElementById('edit-exercises-list');
+      const list = routine[activeEditDay] || [];
+      container.innerHTML = list.map((ex, idx) => `
+        <div class="flex items-center gap-2">
+          <input type="text" value="${ex}" id="edit-ex-${idx}" class="flex-1 bg-slate-950 border border-slate-800 text-white text-xs rounded p-2">
+          <button onclick="removeExerciseField(${idx})" class="text-red-400 hover:text-red-300 p-2"><i class="fa-solid fa-trash text-xs"></i></button>
+        </div>
+      `).join('');
+    }
+
+    function addNewExerciseField() {
+      if (!routine[activeEditDay]) routine[activeEditDay] = [];
+      routine[activeEditDay].push("Nuevo Ejercicio");
+      renderEditExercises();
+    }
+
+    function removeExerciseField(idx) {
+      routine[activeEditDay].splice(idx, 1);
+      renderEditExercises();
+    }
+
+    function saveRoutineChanges() {
+      const list = routine[activeEditDay] || [];
+      const updated = [];
+      list.forEach((_, idx) => {
+        const val = document.getElementById(`edit-ex-${idx}`)?.value;
+        if (val && val.trim() !== '') updated.push(val.trim());
+      });
+      routine[activeEditDay] = updated;
+      localStorage.setItem('gympro_routine', JSON.stringify(routine));
+      closeEditModal();
+      renderWorkout();
+      updateStickyProgress();
+      syncToFirebase();
+    }
+
+    function exportCSV() {
+      let csv = "Semana,Dia,Ejercicio,Serie,Peso,Unidad,Reps,Nota\n";
+      Object.keys(workoutData).forEach(key => {
+        const [wk, day, exIdx] = key.split('_');
+        const exName = (routine[day] && routine[day][exIdx]) || `Ejercicio ${exIdx}`;
+        const data = workoutData[key];
+
+        if (data.sets) {
+          data.sets.forEach((s, idx) => {
+            if (s.weight || s.reps) {
+              csv += `${wk},${day},"${exName}",${idx + 1},${s.weight || 0},${s.unit || 'kg'},${s.reps || 0},"${data.notes || ''}"\n`;
+            }
+          });
+        }
+      });
+
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `GymPRO_Reporte_8Semanas.csv`;
+      a.click();
+    }
+
+    function exportJSON() {
+      const backup = { routine, workoutData, bodyData };
+      const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `GymPRO_Backup.json`;
+      a.click();
+    }
+
+    function importJSON(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        try {
+          const data = JSON.parse(evt.target.result);
+          if (data.workoutData) localStorage.setItem('gympro_logs', JSON.stringify(data.workoutData));
+          if (data.routine) localStorage.setItem('gympro_routine', JSON.stringify(data.routine));
+          if (data.bodyData) localStorage.setItem('gympro_body', JSON.stringify(data.bodyData));
+          location.reload();
+        } catch (err) {
+          alert('Archivo de respaldo no válido.');
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    function toggleCloudConfig() {
+      document.getElementById('cloud-config-box').classList.toggle('hidden');
+    }
+
+    function saveFirebaseConfig() {
+      const raw = document.getElementById('firebase-config-input').value;
+      try {
+        const cfg = JSON.parse(raw);
+        localStorage.setItem('gympro_firebase_cfg', JSON.stringify(cfg));
+        initFirebase(cfg);
+        alert('Configuración de nube guardada con éxito.');
+      } catch (err) {
+        alert('JSON de configuración Firebase no válido.');
+      }
+    }
+
+    function initFirebaseFromStorage() {
+      const stored = localStorage.getItem('gympro_firebase_cfg');
+      if (stored) {
+        try {
+          initFirebase(JSON.parse(stored));
+        } catch (e) {}
+      }
+    }
+
+    function initFirebase(cfg) {
+      if (!firebase.apps.length) {
+        firebase.initializeApp(cfg);
+      }
+      db = firebase.firestore();
+      document.getElementById('cloud-status-text').textContent = "Conectado a Nube (Firebase Sync Activo)";
+      document.getElementById('cloud-status-text').className = "text-[10px] text-emerald-400 font-semibold";
+      pullFromFirebase();
+    }
+
+    function syncToFirebase() {
+      if (!db) return;
+      db.collection('gympro_users').doc('user_data').set({
+        workoutData,
+        routine,
+        bodyData,
+        updatedAt: new Date()
+      }, { merge: true });
+    }
+
+    function pullFromFirebase() {
+      if (!db) return;
+      db.collection('gympro_users').doc('user_data').get().then(doc => {
+        if (doc.exists) {
+          const data = doc.data();
+          if (data.workoutData) workoutData = data.workoutData;
+          if (data.routine) routine = data.routine;
+          if (data.bodyData) bodyData = data.bodyData;
+          localStorage.setItem('gympro_logs', JSON.stringify(workoutData));
+          localStorage.setItem('gympro_routine', JSON.stringify(routine));
+          localStorage.setItem('gympro_body', JSON.stringify(bodyData));
+          renderWorkout();
+          updateStickyProgress();
+        }
+      });
+    }
+  </script>
+</body>
+</html>
